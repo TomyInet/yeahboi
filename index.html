@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PH Room Scanner & Admin</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #fdf2f8;
+            margin: 0;
+            color: #1e1b4b;
+        }
+
+        /* 🗺️ Navigation Header */
+        nav {
+            display: none;
+            /* Hidden until unlocked via Admin Auth */
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .nav-btn {
+            background-color: #fbcfe8;
+            color: #9d174d;
+            border: none;
+            padding: 10px 20px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .nav-btn.active {
+            background-color: #db2777;
+            color: white;
+            box-shadow: 0 4px 12px rgba(219, 39, 119, 0.2);
+        }
+
+        .scanner-card {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(219, 39, 119, 0.15);
+            text-align: center;
+            width: 95%;
+            max-width: 550px;
+            border: 2px solid #fbcfe8;
+            box-sizing: border-box;
+        }
+
+        h2 {
+            color: #db2777;
+            margin-top: 0;
+        }
+
+        /* 🔒 Login Overlay Styles */
+        #login-overlay {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-input {
+            width: 85%;
+            padding: 14px 16px;
+            margin: 15px 0;
+            border-radius: 12px;
+            border: 2px solid #fbcfe8;
+            background-color: #fff5f7;
+            color: #9d174d;
+            font-size: 1rem;
+            text-align: center;
+            font-weight: 500;
+            box-sizing: border-box;
+        }
+
+        .login-input:focus {
+            outline: none;
+            border-color: #db2777;
+            background-color: #ffffff;
+        }
+
+        .btn {
+            background-color: #db2777;
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 12px;
+            cursor: pointer;
+            width: 85%;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(219, 39, 119, 0.3);
+        }
+
+        .btn:hover {
+            background-color: #be185d;
+            transform: translateY(-1px);
+        }
+
+        #login-error {
+            color: #e11d48;
+            font-size: 0.9rem;
+            margin-top: 12px;
+            display: none;
+            font-weight: 600;
+        }
+
+        /* 💻 App Functional Views */
+        .view-panel {
+            display: none;
+        }
+
+        .view-panel.active {
+            display: block;
+        }
+
+        /* 📷 Scanner View Interface */
+        #reader {
+            width: 100%;
+            border-radius: 16px;
+            overflow: hidden;
+            border: none !important;
+            background: #000;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+        }
+
+        #status-overlay {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 14px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            background: #f1f5f9;
+            color: #475569;
+            transition: all 0.3s ease;
+            border: 1px solid #e2e8f0;
+        }
+
+        .status-success {
+            background-color: #10b981 !important;
+            color: white !important;
+            border: none !important;
+        }
+
+        .status-duplicate {
+            background-color: #f59e0b !important;
+            color: white !important;
+            border: none !important;
+        }
+
+        .status-error {
+            background-color: #ef4444 !important;
+            color: white !important;
+            border: none !important;
+        }
+
+        .time-label {
+            font-size: 0.9rem;
+            font-weight: normal;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        /* ⚙️ Generator View Interface Form Styles */
+        .form-group {
+            text-align: left;
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #9d174d;
+        }
+
+        .btn-gen {
+            background-color: #10b981;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn-gen:hover {
+            background-color: #059669;
+        }
+
+        /* 🖨️ Printable ID Pass Template Card */
+        #printable-card {
+            background: white;
+            color: black;
+            padding: 25px;
+            border-radius: 16px;
+            margin-top: 25px;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            border: 2px dashed #fbcfe8;
+            width: 260px;
+            margin-left: auto;
+            margin-right: auto;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        #qrcode-canvas {
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+        }
+
+        #printable-card h3 {
+            margin: 15px 0 5px 0;
+            font-size: 1.3rem;
+            color: #1e1b4b;
+            text-align: center;
+        }
+
+        #printable-card p {
+            margin: 0 0 15px 0;
+            color: #64748b;
+            font-weight: 600;
+            font-size: 0.95rem;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-print {
+            background-color: #6366f1;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+            padding: 10px 20px;
+            width: 100%;
+        }
+
+        .btn-print:hover {
+            background-color: #4f46e5;
+        }
+
+        /* ⚠️ VPS SSL Warning Banner */
+        #vps-warning {
+            display: none;
+            background-color: #fff1f2;
+            border: 2px solid #f43f5e;
+            color: #9f1239;
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            margin-top: 15px;
+            text-align: left;
+            font-weight: 500;
+        }
+
+        /* 🖨️ Dynamic Print Layout Mode Override */
+        @media print {
+
+            body,
+            .scanner-card,
+            nav {
+                background: none !important;
+                box-shadow: none !important;
+                border: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            body * {
+                display: none !important;
+            }
+
+            #printable-card,
+            #printable-card * {
+                display: flex !important;
+            }
+
+            #printable-card {
+                border: none !important;
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+            }
+
+            .btn-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav id="admin-nav">
+        <button id="nav-scan" class="nav-btn active" onclick="switchView('scanner-view')">📷 Live Scanner</button>
+        <button id="nav-gen" class="nav-btn" onclick="switchView('generator-view')">🖨️ QR Generator</button>
+        <button id="nav-logout" class="nav-btn" style="background:#ef4444;color:white;" onclick="logout()">🚪 Log
+            Out</button>
+    </nav>
+
+    <div class="scanner-card">
+        <div id="login-overlay">
+            <h2>Admin Authentication</h2>
+            <p style="color: #9d174d; font-size: 0.9rem; margin: 0 0 10px 0; font-weight: 500;">Enter your last name to
+                unlock the dashboard.</p>
+            <input type="text" id="admin-name" class="login-input" placeholder="Admin last name">
+            <button class="btn" onclick="checkLogin()">Unlock System</button>
+            <div id="login-error">❌ Unauthorized admin</div>
+        </div>
+
+        <div id="scanner-view" class="view-panel">
+            <h2>Estrada Attendance Scanner</h2>
+            <div id="reader"></div>
+            <div id="status-overlay">Ready to Scan...</div>
+
+            <div id="vps-warning">
+                ⚠️ <strong>Camera Blocked by Browser!</strong><br>
+                Browsers require a secure connection to use webcams. Since you are hosting on a VPS, please ensure:
+                <ul style="margin: 5px 0 0 20px; padding: 0;">
+                    <li>You are using an <strong>https://</strong> domain, OR</li>
+                    <li>You have enabled "Insecure origins treated as secure" flags in your browser settings for this IP
+                        address.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="generator-view" class="view-panel">
+            <h2>Generate Student QR Pass</h2>
+            <p style="color: #9d174d; font-size: 0.9rem; margin: -5px 0 20px 0;">Add to Google Sheet roster and generate
+                ID card</p>
+
+            <div class="form-group">
+                <label for="student-lrn">LRN / Student Number</label>
+                <input type="text" id="student-lrn" class="login-input" style="width:100%; margin: 0;"
+                    placeholder="e.g., 20260001">
+            </div>
+
+            <div class="form-group">
+                <label for="student-name">Full Name</label>
+                <input type="text" id="student-name" class="login-input" style="width:100%; margin: 0;"
+                    placeholder="e.g., Juan Dela Cruz">
+            </div>
+
+            <button class="btn btn-gen" onclick="generateStudentQR()">Generate & Register</button>
+
+            <div id="printable-card">
+                <div id="qrcode-canvas"></div>
+                <h3 id="card-name">Student Name</h3>
+                <p id="card-lrn">LRN: 00000000</p>
+                <button class="btn btn-print" onclick="window.print()">Print Pass</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = null;
+        let html5QrcodeScanner = null;
+        let isProcessing = false;
+        let qrEngine = null;
+
+        const statusDiv = document.getElementById('status-overlay');
+        const qrContainer = document.getElementById("qrcode-canvas");
+
+        async function checkLogin() {
+            const username = document.getElementById('admin-name').value.trim();
+            const errorDiv = document.getElementById('login-error');
+
+            errorDiv.style.display = 'none';
+            if (!username) {
+                errorDiv.innerText = 'Please enter your administrator last name.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username }),
+                });
+                const data = await response.json();
+
+                if (response.ok && data.status === 'success') {
+                    authToken = data.token;
+                    document.getElementById('login-overlay').style.display = 'none';
+                    document.getElementById('admin-nav').style.display = 'flex';
+                    switchView('scanner-view');
+                } else {
+                    errorDiv.innerText = data.message || 'Unauthorized admin';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (err) {
+                errorDiv.innerText = 'Unable to reach server. Please try again.';
+                errorDiv.style.display = 'block';
+                console.error(err);
+            }
+        }
+
+        function logout() {
+            authToken = null;
+            stopScanner();
+            document.getElementById('login-overlay').style.display = 'flex';
+            document.getElementById('admin-nav').style.display = 'none';
+            document.getElementById('login-error').style.display = 'none';
+            document.getElementById('admin-name').value = '';
+            document.getElementById('status-overlay').className = '';
+            document.getElementById('status-overlay').innerText = 'Ready to Scan...';
+            document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+        }
+
+        // 🗺️ Layout Engine Switcher Tabs
+        function switchView(viewId) {
+            // Toggle view visibility
+            document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+
+            // Handle Active Tab Classes
+            document.getElementById('nav-scan').classList.remove('active');
+            document.getElementById('nav-gen').classList.remove('active');
+
+            if (viewId === 'scanner-view') {
+                document.getElementById('nav-scan').classList.add('active');
+                startScanner();
+            } else {
+                document.getElementById('nav-gen').classList.add('active');
+                stopScanner(); // Terminate camera when on generator view to save VPS resources
+            }
+        }
+
+        function onScanSuccess(decodedText) {
+            if (isProcessing) return;
+            isProcessing = true;
+
+            statusDiv.className = '';
+            statusDiv.innerText = "Processing code...";
+
+            fetch('/api/scan', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`,
+                },
+                body: JSON.stringify({ studentId: decodedText })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        statusDiv.className = 'status-success';
+                        statusDiv.innerHTML = `✓ Attendance Recorded<br><strong>${data.name}</strong><div class="time-label">${data.time}</div>`;
+                    } else if (data.status === 'duplicate') {
+                        statusDiv.className = 'status-duplicate';
+                        statusDiv.innerHTML = `⚠️ Already Present<br><strong>${data.name}</strong><div class="time-label">Time already logged</div>`;
+                    } else if (data.status === 'not_found') {
+                        statusDiv.className = 'status-error';
+                        statusDiv.innerHTML = `❌ Invalid QR Code<br><div class="time-label">Student not in roster</div>`;
+                    } else {
+                        throw new Error();
+                    }
+
+                    setTimeout(() => {
+                        statusDiv.className = '';
+                        statusDiv.innerText = "Ready to Scan...";
+                        isProcessing = false;
+                    }, 4000);
+                })
+                .catch(err => {
+                    statusDiv.className = 'status-error';
+                    statusDiv.innerText = "❌ Connection Error";
+                    setTimeout(() => {
+                        statusDiv.className = '';
+                        statusDiv.innerText = "Ready to Scan...";
+                        isProcessing = false;
+                    }, 3000);
+                });
+        }
+
+        function startScanner() {
+            if (html5QrcodeScanner) return; // Prevent multiple instances
+
+            const isSecure = window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            if (!isSecure) {
+                document.getElementById('vps-warning').style.display = 'block';
+            }
+
+            html5QrcodeScanner = new Html5QrcodeScanner("reader", {
+                fps: 15,
+                qrbox: 350,
+                aspectRatio: 1.0
+            });
+            html5QrcodeScanner.render(onScanSuccess);
+        }
+
+        function stopScanner() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.clear().then(() => {
+                    html5QrcodeScanner = null;
+                }).catch(err => console.error("Error stopping camera instance: ", err));
+            }
+        }
+
+        // --- ⚙️ CLIENT-SIDE QR GENERATION & REGISTRATION ROUTINE ---
+        function generateStudentQR() {
+            const lrn = document.getElementById('student-lrn').value.trim();
+            const name = document.getElementById('student-name').value.trim();
+
+            if (!lrn || !name) {
+                alert('Please fill out both LRN and Name fields.');
+                return;
+            }
+
+            // 1. Send data payload packet upstream to Node.js backend running on the VPS
+            fetch('/api/students/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`,
+                },
+                body: JSON.stringify({ studentId: lrn, name: name })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // 2. Wipe clean previous generation footprint frame
+                        qrContainer.innerHTML = "";
+
+                        // 3. Render pure JS client-side local vector tracking QR asset
+                        qrEngine = new QRCode(qrContainer, {
+                            text: lrn,
+                            width: 180,
+                            height: 180,
+                            colorDark: "#1e1b4b",
+                            colorLight: "#ffffff",
+                            correctLevel: QRCode.CorrectLevel.H
+                        });
+
+                        // 4. Update elements inside display profile badge card
+                        document.getElementById('card-name').innerText = name;
+                        document.getElementById('card-lrn').innerText = `LRN: ${lrn}`;
+                        document.getElementById('printable-card').style.display = 'flex';
+
+                        // Clear input forms safely
+                        document.getElementById('student-lrn').value = '';
+                        document.getElementById('student-name').value = '';
+                    } else {
+                        alert('Failed to register student to roster. Check VPS console.');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('Server error connecting to backend API database endpoint.');
+                });
+        }
+
+        // Input Key listener setup for easy UX login tracking
+        document.getElementById('admin-name').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                checkLogin();
+            }
+        });
+    </script>
+
+</body>
+
+</html>
